@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Core Defense - Repel the Void</title>
+    <!-- Poki SDK -->
+    <script src="https://game-cdn.poki.com/scripts/v2/poki-sdk.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #050505;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 2rem;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .score-container,
+        .health-container {
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .health-bar {
+            display: flex;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .health-pip {
+            width: 30px;
+            height: 10px;
+            background: #fff;
+            box-shadow: 0 0 10px #fff;
+            transition: all 0.3s ease;
+        }
+
+        .health-pip.lost {
+            background: #333;
+            box-shadow: none;
+            opacity: 0.3;
+        }
+
+        /* Start Screen */
+        #start-screen,
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            transition: opacity 0.5s;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            background: linear-gradient(to right, #00f3ff, #ff00ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            animation: pulse-title 3s infinite;
+        }
+
+        @keyframes pulse-title {
+            0% {
+                filter: brightness(1);
+                text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            }
+
+            50% {
+                filter: brightness(1.3);
+                text-shadow: 0 0 40px rgba(255, 0, 255, 0.5);
+            }
+
+            100% {
+                filter: brightness(1);
+                text-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            }
+        }
+
+        p {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .instruction-tag {
+            color: #00f3ff;
+            font-weight: bold;
+        }
+
+        .instruction-tag.red {
+            color: #ff00ff;
+        }
+
+        button {
+            padding: 1rem 3rem;
+            font-size: 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+
+        button:hover {
+            background: white;
+            color: black;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+        }
+
+        #tutorial {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+        }
+
+        .key-hint {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .key {
+            border: 1px solid #666;
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="score-container">Score: <span id="score-val">0</span></div>
+                <div class="health-container">
+                    SHIELD INTEGRITY
+                    <div class="health-bar" id="health-bar">
+                        <div class="health-pip"></div>
+                        <div class="health-pip"></div>
+                        <div class="health-pip"></div>
+                        <div class="health-pip"></div>
+                        <div class="health-pip"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="start-screen">
+            <h1>NEON CORE</h1>
+            <p>
+                The Void is sending logic fragments to corrupt the core.<br>
+                <span class="instruction-tag">MATCH</span> the core's color to the incoming fragments to <span
+                    class="instruction-tag">REPEL</span> them.<br>
+                Mismatching causes attraction and damage.<br><br>
+                Click or Press <span class="key">SPACE</span> to switch polarity.
+            </p>
+            <button id="start-btn">INITIATE SYSTEM</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1>SYSTEM CRITICAL</h1>
+            <p>The Core has been corrupted.</p>
+            <p style="font-size: 2rem; color: #fff;">FINAL SCORE: <span id="final-score">0</span></p>
+            <div style="display: flex; gap: 20px; margin-top: 20px;">
+                <button id="revive-btn" style="border-color: #00f3ff; color: #00f3ff;">REVIVE (AD)</button>
+                <button id="restart-btn">REBOOT SYSTEM</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Game Constants & Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score-val');
+        const finalScoreEl = document.getElementById('final-score');
+        const healthContainer = document.getElementById('health-bar');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+
+        // --- Robust Poki SDK Integration (Shim Pattern) ---
+        const Poki = (() => {
+            const hasSDK = typeof window.PokiSDK !== 'undefined';
+            const noop = async () => { };
+
+            // Shim to prevent errors if SDK is blocked or fails
+            const PokiShim = {
+                init: async () => { console.log('PokiSDK not found/blocked. Using shim.'); },
+                gameLoadingStart: () => { console.log('Poki: Loading Start'); },
+                gameLoadingFinished: () => { console.log('Poki: Loading Finished'); },
+                gameplayStart: () => { console.log('Poki: Gameplay Start'); },
+                gameplayStop: () => { console.log('Poki: Gameplay Stop'); },
+                commercialBreak: async () => { console.log('Poki: Commercial Break shim'); },
+                rewardedBreak: async () => ({ success: true }), // Dev friendly: always succeed in shim
+                setDebug: (flag) => { }
+            };
+
+            return hasSDK ? window.PokiSDK : PokiShim;
+        })();
+
+        // --- Game State Management ---
+        let width, height, centerX, centerY;
+        let isGameActive = false; // Is a game session currently in progress?
+        let isPaused = false;     // Is the game temporarily paused (ads, tab switch)?
+
+        // Colors
+        const COLOR_CYAN = '#00f3ff';
+        const COLOR_MAGENTA = '#ff00ff';
+        const COLOR_BG = '#050505';
+
+        // Gameplay Variables
+        let score = 0;
+        let health = 5;
+        let coreColor = COLOR_CYAN;
+        let enemies = [];
+        let particles = [];
+        let shockwaves = [];
+        let spawnRate = 60;
+        let gameFrame = 0;
+        let difficultyMultiplier = 1;
+
+        // --- Audio Context & Handling ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // Resume audio context on first user interaction
+        window.addEventListener('pointerdown', () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once: true });
+        window.addEventListener('keydown', () => {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }, { once: true });
+
+        function playSound(type) {
+            if ((!isGameActive && type !== 'start' && type !== 'over') || isPaused) return;
+            // Note: resume is now handled by the global listener above for better browser policy compliance
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'switch') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'repel') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'hit') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        // --- System: Initialization & Resize ---
+
+        async function boot() {
+            try {
+                await Poki.init();
+            } catch (e) {
+                console.warn('Poki init warning:', e);
+            }
+            Poki.gameLoadingStart();
+
+            // "Load" assets (programmatic, so just a small delay or immediate)
+            resize();
+
+            Poki.gameLoadingFinished();
+            // Start screen is already visible via HTML/CSS
+        }
+
+        function resize() {
+            // High DPI Canvas Support
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+            // Set actual canvas size (resolution)
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+
+            // Set CSS size (display size)
+            canvas.style.width = `${window.innerWidth}px`;
+            canvas.style.height = `${window.innerHeight}px`;
+
+            // Normalize coordinate system
+            ctx.scale(dpr, dpr);
+
+            // Logic width/height stays matching CSS pixels for easier math
+            width = window.innerWidth;
+            height = window.innerHeight;
+
+            centerX = width / 2;
+            centerY = height / 2;
+        }
+        window.addEventListener('resize', resize);
+
+        // --- System: Pause/Resume & Visibility ---
+
+        function pauseGame() {
+            if (!isGameActive || isPaused) return;
+            isPaused = true;
+            // Stop sound/loops if handled externally, or just use flag
+        }
+
+        function resumeGame() {
+            if (!isGameActive || !isPaused) return;
+            isPaused = false;
+            requestAnimationFrame(animate); // Restart loop
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                pauseGame();
+            } else {
+                resumeGame(); // Note: This might auto-resume ads if not careful, but basic logic holds
+            }
+        });
+
+        // --- Ad Helpers ---
+
+        async function showAdBreak() {
+            pauseGame();
+            try {
+                await Poki.commercialBreak();
+            } finally {
+                resumeGame();
+            }
+        }
+
+        async function showRewardedAd(onSuccess) {
+            pauseGame();
+            const result = await Poki.rewardedBreak();
+            if (result && result.success) {
+                onSuccess();
+            }
+            resumeGame();
+        }
+
+        // --- Classes ---
+
+        class Core {
+            constructor() {
+                this.radius = 40;
+                this.pulse = 0;
+            }
+
+            draw() {
+                // Pulse effect
+                this.pulse += 0.05;
+                const glow = 20 + Math.sin(this.pulse) * 5;
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+
+                // Outer Glow
+                ctx.shadowBlur = glow;
+                ctx.shadowColor = coreColor;
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+
+                // Inner Color
+                ctx.shadowBlur = 0;
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius - 5, 0, Math.PI * 2);
+                ctx.fillStyle = coreColor;
+                ctx.fill();
+
+                // Ring
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius + 15 + Math.sin(this.pulse * 2) * 2, 0, Math.PI * 2);
+                ctx.strokeStyle = coreColor;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        class Enemy {
+            constructor() {
+                // Spawn randomly around the edge
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.max(width, height) / 2 + 50;
+                this.x = centerX + Math.cos(angle) * dist;
+                this.y = centerY + Math.sin(angle) * dist;
+
+                this.color = Math.random() > 0.5 ? COLOR_CYAN : COLOR_MAGENTA;
+                this.radius = 15;
+                // Speed increases with difficulty
+                this.speed = (2 + Math.random() * 1.5) * difficultyMultiplier;
+                this.angle = Math.atan2(centerY - this.y, centerX - this.x);
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
+
+                this.isRepelled = false;
+                this.markedForDeletion = false;
+
+                // Visual rotation
+                this.rot = 0;
+                this.rotSpeed = (Math.random() - 0.5) * 0.2;
+
+                // Shape type
+                this.sides = Math.floor(Math.random() * 3) + 3; // 3 to 5 sides
+            }
+
+            update() {
+                const dx = centerX - this.x;
+                const dy = centerY - this.y;
+                const distCenter = Math.sqrt(dx * dx + dy * dy);
+
+                // Update velocity based on interactions
+                if (!this.isRepelled) {
+                    // Constant move to center
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // Interaction Zone
+                    if (distCenter < 150) {
+                        if (this.color === coreColor) {
+                            // MATCH: REPEL
+                            this.isRepelled = true;
+                            // Reverse velocity and boost
+                            const angleOut = Math.atan2(this.y - centerY, this.x - centerX);
+                            this.vx = Math.cos(angleOut) * (this.speed * 4); // Fast repel
+                            this.vy = Math.sin(angleOut) * (this.speed * 4);
+
+                            // Score & Effects
+                            createshockwave(centerX, centerY, this.color);
+                            score += 10;
+                            playSound('repel');
+                            spawnParticles(this.x, this.y, this.color, 5);
+                        } else {
+                            // MISMATCH: ATTRACT FASTER (Visual danger)
+                            this.x += this.vx * 0.5; // Accelerate slightly
+                            this.y += this.vy * 0.5;
+                        }
+                    }
+
+                    // Collision with Core
+                    if (distCenter < 50) {
+                        this.markedForDeletion = true;
+                        takeDamage();
+                        spawnParticles(centerX, centerY, '#fff', 20);
+                        createshockwave(centerX, centerY, '#ff0000');
+                    }
+
+                } else {
+                    // Moving away
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    // Shrink and destroy when far
+                    this.radius -= 0.3;
+                    if (this.radius <= 0) this.markedForDeletion = true;
+                }
+
+                this.rot += this.rotSpeed;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rot);
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = '#000';
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+
+                // Draw Polygon
+                ctx.beginPath();
+                for (let i = 0; i < this.sides; i++) {
+                    const theta = (i / this.sides) * Math.PI * 2;
+                    const px = Math.cos(theta) * this.radius;
+                    const py = Math.sin(theta) * this.radius;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1;
+                this.decay = Math.random() * 0.03 + 0.02;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.life;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Shockwave {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = 1;
+                this.maxRadius = 100;
+                this.alpha = 1;
+            }
+
+            update() {
+                this.radius += 5;
+                this.alpha -= 0.05;
+            }
+
+            draw() {
+                if (this.alpha <= 0) return;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 4;
+                ctx.globalAlpha = this.alpha;
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
+        // --- Helper Functions ---
+
+        function spawnParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push(new Particle(x, y, color));
+            }
+        }
+
+        function createshockwave(x, y, color) {
+            shockwaves.push(new Shockwave(x, y, color));
+        }
+
+        function takeDamage() {
+            health--;
+            playSound('hit');
+            // Update UI
+            updateHealthUI();
+
+            // Screen Shake
+            const shake = 20;
+            canvas.style.transform = `translate(${Math.random() * shake - shake / 2}px, ${Math.random() * shake - shake / 2}px)`;
+            setTimeout(() => {
+                canvas.style.transform = 'none';
+            }, 100);
+
+            if (health <= 0) {
+                gameOver();
+            }
+        }
+
+        function updateHealthUI() {
+            const pips = document.querySelectorAll('.health-pip');
+            pips.forEach((pip, index) => {
+                if (index < health) {
+                    pip.classList.remove('lost');
+                } else {
+                    pip.classList.add('lost');
+                }
+            });
+        }
+
+        // --- Core Logic ---
+
+        const core = new Core();
+
+        function switchPolarity() {
+            if (!isGameActive || isPaused) return;
+            coreColor = coreColor === COLOR_CYAN ? COLOR_MAGENTA : COLOR_CYAN;
+            playSound('switch');
+            createshockwave(centerX, centerY, coreColor);
+        }
+
+        // Input
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                if (isGameActive) switchPolarity();
+            }
+        });
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                if (isGameActive) switchPolarity();
+            }
+        });
+        window.addEventListener('touchstart', (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                e.preventDefault();
+                if (isGameActive) switchPolarity();
+            }
+        }, { passive: false });
+
+
+        // --- Game Loop ---
+
+        function initGame() {
+            Poki.gameplayStart();
+
+            isGameActive = true;
+            isPaused = false;
+            score = 0;
+            health = 5;
+            enemies = [];
+            particles = [];
+            shockwaves = [];
+            difficultyMultiplier = 1;
+            spawnRate = 60;
+            updateHealthUI();
+            scoreEl.innerText = score;
+
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+
+            playSound('start');
+            animate();
+        }
+
+        // Wrapper for Restart with Ads
+        function initGameWithAd() {
+            showAdBreak().then(() => {
+                initGame();
+            });
+        }
+
+        function gameOver() {
+            isGameActive = false;
+            Poki.gameplayStop();
+
+            finalScoreEl.innerText = score;
+            gameOverScreen.classList.remove('hidden');
+            playSound('over');
+        }
+
+        function animate() {
+            if (!isGameActive || isPaused) return;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // Background
+            ctx.fillStyle = 'rgba(0, 243, 255, 0.02)';
+            ctx.fillRect(0, 0, width, height);
+
+            // 1. Spawning
+            gameFrame++;
+            if (gameFrame % spawnRate === 0) {
+                enemies.push(new Enemy());
+                if (score > 50) difficultyMultiplier = 1.2;
+                if (score > 150) difficultyMultiplier = 1.5;
+                if (score > 300) { difficultyMultiplier = 1.8; spawnRate = 45; }
+                if (score > 500) { spawnRate = 30; }
+            }
+
+            // 2. Draws
+            core.draw();
+
+            particles.forEach((p, index) => {
+                p.update(); p.draw();
+                if (p.life <= 0) particles.splice(index, 1);
+            });
+
+            shockwaves.forEach((s, index) => {
+                s.update(); s.draw();
+                if (s.alpha <= 0) shockwaves.splice(index, 1);
+            });
+
+            enemies.forEach((enemy, index) => {
+                enemy.update(); enemy.draw();
+                if (enemy.markedForDeletion) enemies.splice(index, 1);
+            });
+
+            scoreEl.innerText = score;
+            requestAnimationFrame(animate);
+        }
+
+        // --- Buttons ---
+        document.getElementById('start-btn').addEventListener('click', initGame);
+
+        document.getElementById('restart-btn').addEventListener('click', initGameWithAd);
+
+        document.getElementById('revive-btn').addEventListener('click', () => {
+            showRewardedAd(() => {
+                console.log("Revive Success");
+                reviveGame();
+            });
+        });
+
+        function reviveGame() {
+            Poki.gameplayStart();
+            health = 5;
+            updateHealthUI();
+            enemies = [];
+            shockwaves = [];
+
+            isGameActive = true;
+            isPaused = false;
+            gameOverScreen.classList.add('hidden');
+            animate();
+            playSound('start');
+        }
+
+        // Boot the system
+        boot();
+    </script>
+</body>
+
+</html>
